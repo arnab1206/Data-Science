@@ -1,0 +1,444 @@
+---
+title: "Arnab's Flexdashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+    orientation: rows
+    theme: united
+    social: ["twitter", "facebook", "menu"]
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(tidyr)
+library(forcats)
+library(highcharter)
+library(knitr)
+library(DT)
+library(openintro)
+library(ggvis)
+library(data.table)
+library(viridis)
+library(crosstalk)
+```
+
+```{r}
+data <- read.csv("C:/Users/ararn/Documents/insurance.csv")
+```
+
+```{r}
+mycolors <- c("blue", "#FFC125", "darkgreen", "darkorange", "pink", "tomato")
+```
+
+```{r include=FALSE}
+# Create a custom theme for the plots. 
+custom_theme <- hc_theme(
+  colors = c('#5CACEE', 'green', 'red'),
+  chart = list(
+         backgroundColor = '#FAFAFA', 
+         plotBorderColor = "black"),
+  xAxis = list(
+         gridLineColor = "E5E5E5", 
+         labels = list(style = list(color = "#333333")), 
+         lineColor = "#E5E5E5", 
+         minorGridLineColor = "#E5E5E5", 
+         tickColor = "#E5E5E5", 
+         title = list(style = list(color = "#333333"))), 
+  yAxis = list(
+         gridLineColor = "#E5E5E5", 
+         labels = list(style = list(color = "#333333")), 
+         lineColor = "#E5E5E5", 
+         minorGridLineColor = "#E5E5E5", 
+         tickColor = "#E5E5E5", 
+         tickWidth = 1, 
+         title = list(style = list(color = "#333333"))),   
+  title = list(style = list(color = '#333333', fontFamily = "Lato")),
+  subtitle = list(style = list(color = '#666666', fontFamily = "Lato")),
+  legend = list(
+         itemStyle = list(color = "#333333"), 
+         itemHoverStyle = list(color = "#FFF"), 
+         itemHiddenStyle = list(color = "#606063")), 
+  credits = list(style = list(color = "#666")),
+  itemHoverStyle = list(color = 'gray'))
+```
+
+Interactive Data Visualization
+=====================================
+
+Row
+-----------------------------------------------------------------------
+
+### Medical Analysis of US
+
+```{r}
+valueBox(paste("Medical Analysis"),
+         color = "warning")
+```
+
+### Medical Problems in US
+
+```{r}
+valueBox(length(data$State),
+         icon = "fa-user")
+```
+
+### **BMI**
+
+```{r}
+gauge(round(mean(data$bmi),
+            digits = 2),
+            min = 0,
+            max = 55,
+            gaugeSectors(warning = c(0, 18),
+                         success = c(18, 26),
+                         danger = c(26, 55),
+                         colors = c("yellow", "green", "red")))
+```
+
+### Texas
+
+```{r}
+valueBox(sum(data$State == "TX"),
+         icon = 'fa-building')
+```
+
+### California
+
+```{r}
+valueBox(sum(data$State == "CA"),
+         icon = 'fa-building')
+```
+
+### Florida
+
+```{r}
+valueBox(sum(data$State == "FL"),
+         icon = 'fa-building')
+```
+
+### Arizona
+
+```{r}
+valueBox(sum(data$State == "AZ"),
+         icon = 'fa-building')
+```
+
+Row
+-------------------------------
+
+### Meical Issues By State
+
+```{r}
+p1 <- data %>%
+         group_by(State) %>%
+         summarise(count = n()) %>%
+         plot_ly(x = ~State,
+                 y = ~count,
+                 color = "blue",
+                 type = 'bar') %>%
+layout(xaxis = list(title = "Medical Issues By State"),
+yaxis = list(title = 'Count'))
+p1
+```
+
+### Pie Chart of Top States
+
+```{r}
+p2 <- data %>%
+         group_by(State) %>%
+         summarise(count = n()) %>%
+         filter(count>50) %>%
+         plot_ly(labels = ~State,
+                 values = ~count,
+                 marker = list(colors = mycolors)) %>%
+         add_pie(hole = 0.2) %>%
+         layout(xaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels = F,
+                             showgrid = F),
+                yaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels=F,
+                             showgrid=F))
+p2
+```
+
+### Age Vs BMI
+
+```{r}
+p3 <- plot_ly(data,
+              x = ~age,
+              y = ~bmi,
+              text = paste("Age:", data$age,
+                           "BMI:",
+                           data$bmi),
+              type = "bar") %>%
+         layout(xaxis = list(title="Age"),
+                yaxis = list(title = "BMI"))
+p3
+```
+
+Row
+------------------------------------
+### Scatter Plot of Month Vs Charges
+
+```{r}
+p4 <- plot_ly(data, x=~age) %>%
+         add_markers(y = ~charges,
+                     text = ~paste("Cost: ", charges),
+                     showlegend = F) %>%
+         add_lines(y = ~fitted(loess(charges ~ age)),
+                   name = "Average spending",
+                   color = I("#FFC125"),
+                   showlegend = T,
+                   line = list(width=5)) %>%
+         layout(xaxis = list(title = "Age"),
+                yaxis = list(title = "Charges"))
+p4
+```
+
+### Box Plot of Regions
+
+```{r}
+p5 <- data %>%
+  ggplot( aes(region, charges, size = charges, color=region)) +
+  geom_point() +
+  theme_bw()
+p5
+```
+
+### Box Plot of Medical Charges by Smoking Status
+
+```{r}
+ggplot(data = data,aes(smoker,charges)) + geom_boxplot(fill = c(2:3)) +
+  theme_classic()
+```
+
+Map
+========================================
+
+### Map
+
+```{r}
+insurance <- data %>%
+         group_by(State) %>%
+         summarize(total = n())
+
+insurance$State <- abbr2state(insurance$State)
+
+highchart() %>%
+         hc_title(text = "Total insurances in US") %>%
+         hc_subtitle(text = "Source: insurance.csv") %>%
+         hc_add_series_map(usgeojson, insurance,
+                           name = "State",
+                           value = "total",
+                           joinBy = c("woename", "State")) %>%
+         hc_mapNavigation(enabled = T)
+```
+
+
+Data Table
+========================================
+
+```{r}
+datatable(data,
+          caption = "Medical Cost Data",
+          rownames = T,
+          filter = "top",
+          options = list(pageLength = 30))
+```
+
+Total Charges
+========================================================================
+
+Column {.tabset .tabset-fade data-width=400 .colored }
+-----------------------------------------------------------------------
+
+### By state {.no-padding}
+```{r fig.height=4.55}
+data <- as.data.table(data)
+data[,count := .N,by="State"]
+
+# Create tibble for overall charges by state
+State_bar <- data %>%
+  select(State, charges, count) %>%
+  group_by(State) %>%
+  summarise(charges_capita = round((sum(charges)/sum(count)), 2)) %>%
+  arrange(desc(charges_capita))
+
+# Create interactive bar plot
+highchart() %>%
+    hc_add_series(State_bar, hcaes(x = State, y = charges_capita, color = charges_capita), type = "bar")  %>% 
+    hc_tooltip(borderWidth = 1.5, 
+               pointFormat = paste("Charges: <b>{point.y}</b>")) %>%
+    hc_legend(enabled = FALSE) %>%
+    hc_title(text = "Charges by State") %>% 
+    hc_xAxis(categories = State_bar$State, 
+             labels = list(step = 1),
+             min = 0, max = 25,
+             scrollbar = list(enabled = TRUE)) %>%
+    hc_yAxis(title = list(text = "Total Charges")) %>%
+    hc_plotOptions(bar = list(stacking = "normal", 
+                              pointPadding = 0, groupPadding = 0, borderWidth = 0.5)) %>%
+  hc_add_theme(custom_theme)
+```
+
+### By Gender and Age {.no-padding}
+```{r}
+# Create tibble for charges by age and sex. 
+sex_color <- c("pink", "tomato")
+age_bar_sex <- data %>%
+  select(age, sex, count, charges) %>%
+  group_by(age, sex) %>%
+  summarise(charges_capita = round((sum(charges)/sum(count)), 2))
+
+# Create bar chart of charges by sex.
+highchart() %>%
+    hc_add_series(age_bar_sex, hcaes(x = age, y = charges_capita, group = sex), type = "bar", color = sex_color)  %>% 
+    hc_tooltip(borderWidth = 1.5, pointFormat = paste("Gender: <b>{point.sex} ({point.percentage:.1f}%)</b> <br> Round up charges: <b>{point.y}</b>")) %>%
+    hc_legend(enabled = TRUE, colorByPoint = TRUE) %>%
+    hc_title(text = "Charges by age and gender") %>% 
+    hc_plotOptions(bar = list(stacking = "percent", 
+                              pointPadding = 0, groupPadding = 0, borderWidth = 0.4)) %>% 
+    hc_add_theme(custom_theme)
+```
+
+Dynamic Search {data-orientation=columns}
+=======================================================================
+
+Column {data-width=275}
+-----------------------------------------------------------------------
+
+### Filters {.no-title .colored }
+
+**Pick/Select filters here:**
+
+```{r}
+# Create tibble for our line plot. 
+State_bmi_tibble <- data %>%
+  select(State, bmi, charges, count, smoker) %>%
+  group_by(State, bmi, smoker) %>%
+  summarise(charges_capita = round((sum(charges)), 2))
+
+# Create shared data that will be used to link filters, data table, and line plot. 
+shared_data <- SharedData$new(State_bmi_tibble, group = 'hello')
+
+# Create filter for year and country. These filters will adjust the DT datatable and PLOTLY plot. 
+filter_slider("Bmi", "Bmi", shared_data, ~bmi, step = 1)
+filter_select("State", "State", shared_data, ~State, allLevels = TRUE, multiple = TRUE)
+filter_select("Smoker", "Smoker", shared_data, ~smoker, allLevels = TRUE, multiple = TRUE)
+```
+
+***
+
+```{r}
+# Create datatable. 
+datatable(shared_data,
+          rownames = FALSE,
+          colnames = c('State', 'Bmi', 'Smoker', 'Charges'),
+          class = 'cell-border stripe',
+          width = '100%',
+          extensions = "Scroller",
+          options=list(deferRender = FALSE, 
+                       scrollY = 280, 
+                       scrollCollapse = TRUE,
+                       scroller = TRUE,
+                       dom = 't'))
+```
+
+Column {data-width=725}
+-----------------------------------------------------------------------
+
+### Charges by state {.no-title .colored }
+```{r}
+# Set a random seed. We will do this so that we can reproduce the random sample of colors we will use for our next graph. 
+set.seed(80085)
+
+# Create line graph. 
+plot_ly(shared_data, x = ~bmi, y = ~charges_capita, 
+       color = ~State, colors = sample(colours(), 120),
+        mode = 'lines',
+       hoverinfo = 'text', text = ~paste("State: ", State, '<br>Bmi: ', bmi, "<br>Charges: ", charges_capita, "<br>Smoker: ", smoker)) %>%
+       layout(showlegend = TRUE,
+              title = "Charges by State on different BMIs",
+              xaxis = list(title = "Bmi"),
+              yaxis = list(title = "Charges")) %>%
+       layout(plot_bgcolor = 'transparent') %>% 
+       layout(paper_bgcolor = 'transparent') %>% 
+       add_markers() %>% 
+       highlight("plotly_click")
+```
+
+Summary 
+===========================================
+
+---------------------------
+
+Report
+
+* The dataset is regarding Medical Cost of different individuals of United States with 1338 rows.
+
+* The dataset is downloaded from https://www.kaggle.com/mirichoi0218/insurance .
+
+* The dataset has different features like Charges(total spending), Age, Sex, Smoker or Non Smoker, BMI(body mass index), Childrens.
+
+* The flexdashboard contains various interactive visualizations. 
+
+The main purpose behind the visualizations was to learn on what factors does medical charges increases?
+
+The medical charges increases with ->
+
+1. Increase in age.
+2. Increase in BMI.
+3. If he/she is a smoker.
+
+The above answers are depicted in different visualization plots shown in the previous tabs.
+
+Row 
+-----------------------------------
+
+### Maximum Spent
+
+```{r}
+valueBox(max(data$charges),
+         icon = "fa-user" )
+```
+
+### Average Spent
+```{r}
+valueBox(round(mean(data$charges),
+               digits = 2),
+         icon = "fa-area-chart")
+```
+
+### Average BMI
+
+```{r}
+valueBox(round(mean(data$bmi), digits = 2),
+         icon = "fa-area-chart")
+```
+
+Row 
+-----------------------------------
+
+THANK YOU
+
+About Report
+========================================
+
+STATISTICS FOR DATA SCIENCE
+
+The Interactive Visualisation report:
+
+Created by: Arnab Roy
+
+Date: 29th April 2020
+
+Course: Masters in Data Science
+
+C00246500
+
+Institute of Carlow, Carlow
